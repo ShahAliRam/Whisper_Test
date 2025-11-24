@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VAD Speech-to-Text with Whisper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+        }
+
+        .side-panel {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .record-button {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            margin-bottom: 15px;
+        }
+
+        .record-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        .record-button:active {
+            transform: scale(0.95);
+        }
+
+        .record-button.recording {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 5px 15px rgba(245, 87, 108, 0.4);
+            }
+            50% {
+                box-shadow: 0 5px 30px rgba(245, 87, 108, 0.8);
+            }
+        }
+
+        .status {
+            text-align: center;
+            font-size: 1em;
+            color: #666;
+            min-height: 24px;
+        }
+
+        .status.recording {
+            color: #f5576c;
+            font-weight: bold;
+        }
+
+        .status.processing {
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .transcription-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            min-height: 150px;
+            margin-top: 20px;
+            border: 2px solid #e9ecef;
+        }
+
+        .transcription-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .transcription-text {
+            color: #212529;
+            font-size: 1.1em;
+            line-height: 1.8;
+            word-wrap: break-word;
+            direction: rtl;
+            text-align: right;
+            unicode-bidi: plaintext;
+            font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Segoe UI', Tahoma, Arial, sans-serif;
+            white-space: pre-wrap;
+        }
+
+        .transcription-text.empty {
+            color: #adb5bd;
+            font-style: italic;
+        }
+
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .settings {
+            background: #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 0.85em;
+        }
+
+        .settings-label {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .settings-info {
+            color: #666;
+            font-size: 0.85em;
+            line-height: 1.5;
+        }
+
+        .audio-list {
+            margin-top: 15px;
+        }
+
+        .audio-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .audio-item:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+
+        .audio-item.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .audio-name {
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .audio-transcription {
+            font-size: 0.8em;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+            direction: rtl;
+            text-align: right;
+            unicode-bidi: plaintext;
+            font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Segoe UI', Tahoma, Arial, sans-serif;
+        }
+
+        .audio-item.active .audio-transcription {
+            color: #f0f0f0;
+        }
+
+        .play-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            font-size: 0.8em;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        .play-button:hover {
+            background: #5568d3;
+        }
+
+        .section-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Left Panel: Sample Audios -->
+        <div class="side-panel">
+            <div class="section-title">📁 Sample Audios</div>
+            <div id="sampleAudios" class="audio-list">
+                <div style="text-align: center; color: #999; padding: 20px;">Loading...</div>
+            </div>
+        </div>
+
+        <!-- Center Panel: Main Recording Interface -->
+        <div class="container">
+            <h1>🎤 Speech-to-Text</h1>
+            <p class="subtitle">Powered by Whisper Large-v3-Turbo (8kHz Mono)</p>
+
+            <div class="settings">
+                <div class="settings-label">VAD Settings</div>
+                <div class="settings-info">
+                    ✓ Silence threshold: 1 second<br>
+                    ✓ Automatic recording stop on silence<br>
+                    ✓ Output: 8kHz Mono WAV format
+                </div>
+            </div>
+
+            <div class="control-panel">
+                <button id="recordButton" class="record-button">START</button>
+                <div id="status" class="status">Click START to begin recording</div>
+            </div>
+
+            <div class="loader" id="loader"></div>
+
+            <div class="transcription-box">
+                <div class="transcription-label">Transcription:</div>
+                <div id="transcription" class="transcription-text empty">
+                    Your transcription will appear here...
+                </div>
+            </div>
+
+            <div id="error" class="error"></div>
+        </div>
+
+        <!-- Right Panel: Session History -->
+        <div class="side-panel">
+            <div class="section-title">📝 Session History</div>
+            <div id="sessionHistory" class="audio-list">
+                <div style="text-align: center; color: #999; padding: 20px;">No recordings yet</div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="audioPlayer" style="display: none;"></audio>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let silenceTimeout;
+        let audioContext;
+        let analyser;
+        let silenceStart = null;
+        let stream;
+        let vadCheckInterval;
+        let hasDetectedSpeech = false;
+
+        const recordButton = document.getElementById('recordButton');
+        const statusDiv = document.getElementById('status');
+        const transcriptionDiv = document.getElementById('transcription');
+        const errorDiv = document.getElementById('error');
+        const loaderDiv = document.getElementById('loader');
+        const audioPlayer = document.getElementById('audioPlayer');
+
+        const SILENCE_THRESHOLD = 1000; // 1 second in milliseconds
+        const SILENCE_LEVEL = 0.01; // Normalized threshold for silence detection (0-1)
+        const CHECK_INTERVAL = 100; // Check every 100ms
+
+        // Load sample audios and session history on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadSampleAudios();
+            loadSessionHistory();
+        });
+
+        recordButton.addEventListener('click', toggleRecording);
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                errorDiv.style.display = 'none';
+                audioChunks = [];
+                silenceStart = null;
+                hasDetectedSpeech = false;
+                
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                });
+                
+                // Setup audio context for VAD
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 512;
+                analyser.smoothingTimeConstant = 0.8;
+                source.connect(analyser);
+
+                // Start recording with time slicing for better responsiveness
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm'
+                });
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await sendAudioForTranscription(audioBlob);
+                };
+
+                mediaRecorder.start(100); // Collect data every 100ms
+                isRecording = true;
+                recordButton.textContent = 'RECORDING';
+                recordButton.classList.add('recording');
+                recordButton.disabled = true;
+                statusDiv.textContent = 'Recording... Speak now';
+                statusDiv.classList.add('recording');
+
+                // Start VAD monitoring with interval
+                vadCheckInterval = setInterval(checkSilence, CHECK_INTERVAL);
+                
+            } catch (err) {
+                showError('Error accessing microphone: ' + err.message);
+            }
+        }
+
+        function checkSilence() {
+            if (!isRecording || !analyser) return;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteTimeDomainData(dataArray);
+
+            // Calculate RMS (Root Mean Square) for better volume detection
+            let sum = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                const normalized = (dataArray[i] - 128) / 128;
+                sum += normalized * normalized;
+            }
+            const rms = Math.sqrt(sum / bufferLength);
+
+            console.log('Audio level:', rms.toFixed(4)); // Debug output
+
+            if (rms > SILENCE_LEVEL) {
+                // Sound detected
+                hasDetectedSpeech = true;
+                silenceStart = null;
+                statusDiv.textContent = 'Recording... Speaking detected';
+            } else if (hasDetectedSpeech) {
+                // Silence detected after speech
+                if (silenceStart === null) {
+                    silenceStart = Date.now();
+                    statusDiv.textContent = 'Recording... Silence detected';
+                } else {
+                    const silenceDuration = Date.now() - silenceStart;
+                    if (silenceDuration >= SILENCE_THRESHOLD) {
+                        console.log('Silence threshold reached, stopping recording');
+                        stopRecording();
+                    }
+                }
+            }
+        }
+
+        function stopRecording() {
+            if (!isRecording) return;
+
+            console.log('Stopping recording...');
+            isRecording = false;
+            silenceStart = null;
+            
+            // Clear the VAD check interval
+            if (vadCheckInterval) {
+                clearInterval(vadCheckInterval);
+                vadCheckInterval = null;
+            }
+            
+            recordButton.textContent = 'PROCESSING';
+            recordButton.classList.remove('recording');
+            statusDiv.textContent = 'Processing...';
+            statusDiv.classList.remove('recording');
+            statusDiv.classList.add('processing');
+            loaderDiv.style.display = 'block';
+
+            // Stop the media recorder
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            
+            // Stop all tracks
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            
+            // Close audio context
+            if (audioContext) {
+                audioContext.close();
+            }
+        }
+
+        async function sendAudioForTranscription(audioBlob) {
+            try {
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                const response = await fetch('/transcribe', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                loaderDiv.style.display = 'none';
+                statusDiv.classList.remove('processing');
+                recordButton.disabled = false;
+                recordButton.textContent = 'START';
+
+                if (response.ok) {
+                    transcriptionDiv.textContent = data.transcription;
+                    transcriptionDiv.classList.remove('empty');
+                    statusDiv.textContent = 'Transcription complete! Click START to record again';
+                    
+                    // Reload session history
+                    loadSessionHistory();
+                } else {
+                    showError(data.error || 'Transcription failed');
+                }
+                
+            } catch (err) {
+                loaderDiv.style.display = 'none';
+                statusDiv.classList.remove('processing');
+                recordButton.disabled = false;
+                recordButton.textContent = 'START';
+                showError('Error sending audio: ' + err.message);
+            }
+        }
+
+        async function loadSampleAudios() {
+            try {
+                const response = await fetch('/sample_audios');
+                const data = await response.json();
+                
+                const container = document.getElementById('sampleAudios');
+                
+                if (data.samples && data.samples.length > 0) {
+                    container.innerHTML = '';
+                    data.samples.forEach(sample => {
+                        const item = document.createElement('div');
+                        item.className = 'audio-item';
+                        item.innerHTML = `
+                            <div class="audio-name">${sample.filename}</div>
+                            <button class="play-button" onclick="playSampleAudio('${sample.path}', '${sample.filename}')">
+                                ▶ Play & Transcribe
+                            </button>
+                        `;
+                        container.appendChild(item);
+                    });
+                } else {
+                    container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">No samples available</div>';
+                }
+            } catch (err) {
+                console.error('Error loading sample audios:', err);
+            }
+        }
+
+        async function loadSessionHistory() {
+            try {
+                const response = await fetch('/session_history');
+                const data = await response.json();
+                
+                const container = document.getElementById('sessionHistory');
+                
+                if (data.history && data.history.length > 0) {
+                    container.innerHTML = '';
+                    data.history.forEach(item => {
+                        const historyItem = document.createElement('div');
+                        historyItem.className = 'audio-item';
+                        historyItem.innerHTML = `
+                            <div class="audio-name">${item.filename}</div>
+                            <div class="audio-transcription">"${item.transcription}"</div>
+                            <button class="play-button" onclick="playRecordedAudio('${item.path}')">
+                                ▶ Play
+                            </button>
+                        `;
+                        container.appendChild(historyItem);
+                    });
+                } else {
+                    container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">No recordings yet</div>';
+                }
+            } catch (err) {
+                console.error('Error loading session history:', err);
+            }
+        }
+
+        async function playSampleAudio(path, filename) {
+            try {
+                // Play the audio
+                audioPlayer.src = path;
+                audioPlayer.play();
+                
+                // Show loading
+                loaderDiv.style.display = 'block';
+                statusDiv.textContent = 'Transcribing sample audio...';
+                statusDiv.classList.add('processing');
+                
+                // Transcribe the sample
+                const response = await fetch(`/transcribe_sample/${filename}`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                loaderDiv.style.display = 'none';
+                statusDiv.classList.remove('processing');
+                
+                if (response.ok) {
+                    transcriptionDiv.textContent = data.transcription;
+                    transcriptionDiv.classList.remove('empty');
+                    statusDiv.textContent = 'Sample transcription complete!';
+                } else {
+                    showError(data.error || 'Transcription failed');
+                }
+            } catch (err) {
+                loaderDiv.style.display = 'none';
+                statusDiv.classList.remove('processing');
+                showError('Error transcribing sample: ' + err.message);
+            }
+        }
+
+        function playRecordedAudio(path) {
+            audioPlayer.src = path;
+            audioPlayer.play();
+        }
+
+        function showError(message) {
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            statusDiv.textContent = 'Error occurred. Click START to try again';
+            statusDiv.classList.remove('recording', 'processing');
+            recordButton.disabled = false;
+            recordButton.textContent = 'START';
+        }
+    </script>
+</body>
+</html>

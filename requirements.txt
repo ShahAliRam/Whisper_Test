@@ -1,0 +1,11 @@
+flask
+torch
+transformers
+accelerate
+noisereduce
+scipy
+numpy
+soundfile
+librosa
+webrtcvad
+pydub

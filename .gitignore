@@ -1,0 +1,6 @@
+recordings/
+venv/
+create_sample_audios.py
+convert_to_8K.py
+test_audio.py
+*.ipynb
